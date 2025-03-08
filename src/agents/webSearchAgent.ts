@@ -2,11 +2,12 @@ import { ChatOpenAI, OpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { BaseMessage } from "@langchain/core/messages";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { RunnableLambda, RunnableSequence } from "@langchain/core/runnables";
-import { PromptTemplate } from "@langchain/core/prompts";
+import { RunnableLambda, RunnableMap, RunnableSequence } from "@langchain/core/runnables";
+import { ChatPromptTemplate, MessagesPlaceholder, PromptTemplate } from "@langchain/core/prompts";
 import { searchSearxng } from "../lib/serxng";
-import { Document } from "mongoose";
-import { title } from "process";
+import { Document } from "@langchain/core/dist/documents/document";
+import { Embeddings } from "@langchain/core/embeddings";
+import formatChatHistory from "../utils/formatHistory";
 
 const llm = new OpenAI({
   model: "gpt-3.5-turbo",
@@ -105,6 +106,82 @@ const createRetriveSearchQueryChain = (llm: BaseChatModel) => {
   ]);
 };
 
-const createWebSearchAnsweringChain = (llm:BaseChatModel) => {
-    
-}
+const createWebSearchAnsweringChain = (
+  llm: BaseChatModel,
+  embeddings: Embeddings
+) => {
+    //create the chain for retiriving search query by calling the fn we created above
+  const retriveSearchQueryChain = createRetriveSearchQueryChain(llm);
+
+  const processDocs = async (docs: Document[]) => {
+    return docs
+      .map((_, index) => `${index + 1}. ${docs[index].pageContent}`)
+      .join("\n");
+  };
+
+  const rerankDocs = async ({
+    query,
+    docs,
+  }: {
+    query: string;
+    docs: Document[];
+  }) => {
+    if (docs.length === 0) {
+      return docs;
+    }
+
+    const docsWithContent = docs.filter(
+      (doc) => doc.pageContent && doc.pageContent.length > 0
+    );
+
+    const [docEmbeddings, queryEmbedding] = await Promise.all([
+      embeddings.embedDocuments(docsWithContent.map((doc) => doc.pageContent)),
+      embeddings.embedQuery(query),
+    ]);
+
+    const similarity = docEmbeddings.map((docEmbedding, i) => {
+      const sim = computeSimilarity(queryEmbedding, docEmbedding);
+
+      return {
+        index: i,
+        similarity: sim,
+      };
+    });
+
+    const sortedDocs = similarity
+      .sort((a, b) => b.similarity - a.similarity)
+      .filter((sim) => sim.similarity > 0.5)
+      .slice(0, 15)
+      .map((sim) => docsWithContent[sim.index]);
+
+    return sortedDocs;
+  };
+
+  return RunnableSequence.from([
+    RunnableMap.from({
+        query: (input) => input.query,
+        chat_history:(input) => input.chat_history,
+        context:RunnableSequence.from([
+            (input) => ({
+                query:input.query,
+                chat_history:formatChatHistory(input.chat_history)
+            }),
+            retriveSearchQueryChain
+            .pipe(rerankDocs)
+            .withConfig({
+                runName:"FinalSourceRetriver"
+            })
+            .pipe(processDocs)
+        ])
+    }),
+    ChatPromptTemplate.fromMessages([
+        ["system",basicWebSearchResponsePrompt],
+        new MessagesPlaceholder("chat_history"),
+        ["user","{query}"]
+    ]),
+    llm,
+    strParser
+  ]).withConfig({
+    runName:"FinalResponseGenerator"
+  })
+};

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "axios": "^1.8.2",
+    "compute-cosine-similarity": "^1.1.0",
     "langchain": "^0.3.19",
     "ws": "^8.18.1"
   }
