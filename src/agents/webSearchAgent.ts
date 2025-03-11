@@ -8,6 +8,10 @@ import { searchSearxng } from "../lib/serxng";
 import { Document } from "@langchain/core/dist/documents/document";
 import { Embeddings } from "@langchain/core/embeddings";
 import formatChatHistory from "../utils/formatHistory";
+import computeSimilarity from "../utils/computeSimilarity";
+import { BasicChainInput } from "../lib/types";
+import eventEmitter from "events";
+import { StreamEvent } from "@langchain/core/dist/tracers/event_stream";
 
 const llm = new OpenAI({
   model: "gpt-3.5-turbo",
@@ -15,7 +19,7 @@ const llm = new OpenAI({
 });
 
 const chatllm = new ChatOpenAI({
-  model: "gpt-3.5.turbo",
+  model: "gpt-3.5-turbo",
   temperature: 0.7,
 });
 
@@ -89,7 +93,7 @@ const createRetriveSearchQueryChain = (llm: BaseChatModel) => {
         const documents = res.results.map((result) => {
           return new Document({
             pageContent: result.content,
-            metaData: {
+            metadata: {
               title: result.title,
               url: result.url,
               ...(result.img_src && { img_src: result.img_src }),
@@ -159,8 +163,8 @@ const createWebSearchAnsweringChain = (
 
   return RunnableSequence.from([
     RunnableMap.from({
-        query: (input) => input.query,
-        chat_history:(input) => input.chat_history,
+        query: (input: BasicChainInput) => input.query,
+        chat_history:(input: BasicChainInput) => input.chat_history,
         context:RunnableSequence.from([
             (input) => ({
                 query:input.query,
@@ -185,3 +189,85 @@ const createWebSearchAnsweringChain = (
     runName:"FinalResponseGenerator"
   })
 };
+
+const handleStream = async (
+  stream: AsyncGenerator<StreamEvent, any, unknown>,
+  emitter: eventEmitter
+) => {
+  for await (const event of stream) {
+    if (
+      event.event === "on_chain_end" &&
+      event.name === "FinalSourceRetriever"
+    ) {
+      emitter.emit(
+        "data",
+        JSON.stringify({ type: "sources", data: event.data.output })
+      );
+    }
+    if (
+      event.event === "on_chain_stream" &&
+      event.name === "FinalResponseGenerator"
+    ) {
+      emitter.emit(
+        "data",
+        JSON.stringify({ type: "response", data: event.data.chunk })
+      );
+    }
+    if (
+      event.event === "on_chain_end" &&
+      event.name === "FinalResponseGenerator"
+    ) {
+      emitter.emit("end");
+    }
+  }
+};
+
+
+const basicWebSearch = (
+  query: string,
+  history: BaseMessage[],
+  llm: BaseChatModel,
+  embeddings: Embeddings
+) => {
+  const emitter = new eventEmitter();
+
+  try {
+    const basicWebSearchAnsweringChain = createWebSearchAnsweringChain(
+      llm,
+      embeddings
+    );
+
+    const stream = basicWebSearchAnsweringChain.streamEvents(
+      {
+        chat_history: history,
+        query: query,
+      },
+      {
+        version: "v1",
+      }
+    );
+
+    handleStream(stream, emitter);
+  } catch (err) {
+    emitter.emit(
+      "error",
+      JSON.stringify({
+        data: `An error has occurred please try again later: ${err}`,
+      })
+    );
+  }
+
+  return emitter;
+};
+
+const handleWebSearch = (
+  message: string,
+  history: BaseMessage[],
+  llm: BaseChatModel,
+  embeddings: Embeddings
+) => {
+  const emitter = basicWebSearch(message, history, llm, embeddings);
+  return emitter;
+};
+
+export default handleWebSearch;
