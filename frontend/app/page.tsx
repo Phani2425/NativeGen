@@ -1,8 +1,7 @@
+import SidebarComp from "@/components/Sidebar";
 
 export default function Home() {
   return (
-    <div className="">
-     started frontend
-    </div>
+   <SidebarComp/>
   );
 }
