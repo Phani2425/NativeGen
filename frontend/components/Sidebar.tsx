@@ -3,7 +3,10 @@
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import {
   IconArrowLeft,
+  IconBook,
   IconBrandTabler,
+  IconHome,
+  IconSearch,
   IconSettings,
   IconUserBolt,
 } from "@tabler/icons-react";
@@ -12,17 +15,17 @@ import { useState } from "react";
 export default function SidebarComp() {
   const links = [
     {
-      label: "Dashboard",
+      label: "Home",
       href: "#",
       icon: (
-        <IconBrandTabler className="text-neutral-700 dark:text-neutral-200 h-5 w-5 shrink-0" />
+        <IconHome className="text-neutral-700 dark:text-neutral-200 h-5 w-5 shrink-0" />
       ),
     },
     {
-      label: "Profile",
+      label: "Discover",
       href: "#",
       icon: (
-        <IconUserBolt className="text-neutral-700 dark:text-neutral-200 h-5 w-5 shrink-0" />
+        <IconSearch className="text-neutral-700 dark:text-neutral-200 h-5 w-5 shrink-0" />
       ),
     },
     {
@@ -33,10 +36,10 @@ export default function SidebarComp() {
       ),
     },
     {
-      label: "Logout",
+      label: "Library",
       href: "#",
       icon: (
-        <IconArrowLeft className="text-neutral-700 dark:text-neutral-200 h-5 w-5 shrink-0" />
+        <IconBook className="text-neutral-700 dark:text-neutral-200 h-5 w-5 shrink-0" />
       ),
     },
   ];
