@@ -2,15 +2,13 @@
 
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import {
-  IconArrowLeft,
   IconBook,
-  IconBrandTabler,
   IconHome,
   IconSearch,
-  IconSettings,
-  IconUserBolt,
+  IconSettings
 } from "@tabler/icons-react";
 import { useState } from "react";
+import { ModeToggle } from "./ThemeToggle";
 
 export default function SidebarComp() {
   const links = [
@@ -58,7 +56,9 @@ export default function SidebarComp() {
             ))}
           </div>
         </div>
-        <div></div>
+        <div>
+          <ModeToggle/>
+        </div>
       </SidebarBody>
     </Sidebar>
   );

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SidebarComp from "@/components/Sidebar";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,10 +27,24 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased w-screen h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased `}
       >
-      <SidebarComp/>
-       {children} 
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div className="relative h-screen w-full overflow-hidden">
+            {/* Sidebar with z-index to appear above content */}
+            <div className="absolute z-10 h-full">
+              <SidebarComp />
+            </div>
+
+            {/* Main content takes full width */}
+            <main className="">{children}</main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

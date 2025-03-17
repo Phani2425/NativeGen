@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Document } from "@langchain/core/documents";
 import { WebSocket, MessageEvent } from "ws";
+import EmptyChat from "./EmptyChat";
 
 export type Message = {
   id: string;
@@ -11,32 +12,59 @@ export type Message = {
   sources?: Document[];
 };
 
+// const useSocket = (url: string) => {
+//   const [ws, setws] = useState<WebSocket | null>(null);
+
+//   useEffect(() => {
+//     if (!ws) {
+//       const ws = new WebSocket(url);
+//       ws.onopen = () => {
+//         console.log("[DEBUG] open");
+//         setws(ws);
+//       };
+//     }
+
+//     return () => {
+//       ws?.close();
+//     };
+//   }, [ws, url]);
+
+//   return ws;
+// };
+
 const useSocket = (url: string) => {
-  const [ws, setws] = useState<WebSocket | null>(null);
+  const [ws, setWs] = useState<WebSocket | null>(null);
 
   useEffect(() => {
-    if (!ws) {
-      const ws = new WebSocket(url);
-      ws.onopen = () => {
-        console.log("[DEBUG] open");
-        setws(ws);
-      };
-    }
+    // Always create a new WebSocket when URL changes
+    const ws = new WebSocket(url);
+    
+    ws.onopen = () => {
+      console.log("[DEBUG] open");
+      setWs(ws);
+    };
+
+    ws.onclose = () => {
+      console.log("[DEBUG] closed");
+      setWs(null); // Reset state when ws closes
+    };
 
     return () => {
-      ws?.close();
+      ws.close();
     };
-  }, [ws, url]);
+  }, [url]); 
 
   return ws;
 };
 
+
 const ChatWindow = () => {
-  const ws = useSocket(process.env.NEXT_PUBLIC_WS_URL!);
+//   const ws = useSocket(process.env.NEXT_PUBLIC_WS_URL!);
   const [chatHistory, setchatHistory] = useState<Array<[string, string]>>([]);
   const [messages, setmessages] = useState<Message[]>([]);
   const [loading, setloading] = useState<boolean>(false);
   const [messageAppeared, setmessageAppeared] = useState<boolean>(false);
+  const [focusMode,setFocusMode] = useState<string>("webSearch");
 
   // now lets create a function which will help us to send the message to the server
   const sendMessage = async (message: string) => {
@@ -96,7 +124,7 @@ const ChatWindow = () => {
                 content: data.data,
                 id: data.messageId,
                 role: "assistant",
-                sourses: sources,
+                sources: sources,
               }
             ]);
 
@@ -129,7 +157,7 @@ const ChatWindow = () => {
       }
 
       ws?.addEventListener("message", messageHandler);
-      
+
     } catch (err) {
       if (err instanceof Error) {
         console.log(
@@ -147,7 +175,7 @@ const ChatWindow = () => {
     }
   };
 
-  return <div>{messages.length > 0 ? <></> : <></>}</div>;
+  return <div className="w-full h-full">{messages.length > 0 ? <></> : <EmptyChat sendMessage={sendMessage} focusMode={focusMode} setFocusMode={setFocusMode} />}</div>;
 };
 
 export default ChatWindow;
